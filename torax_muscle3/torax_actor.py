@@ -1,4 +1,5 @@
 """
+Modified for PDS integration: optional IMAS initialization settings.
 MUSCLE3 actor wrapping TORAX.
 
 Configuration can be specified as a path to a config file,
@@ -63,6 +64,26 @@ from torax_muscle3.utils import (
 )
 
 logger = logging.getLogger()
+
+
+def normalize_padded_ion_names(core_profiles_data: IDSToplevel) -> None:
+    """Match the legacy actor's handling of fixed-width IMAS ion names.
+
+    The historical 105099 input uses names like "He <padding> He".
+    TORAX expects an element symbol. This accepts only a duplicated two-character
+    label separated by whitespace, which is the malformed fixed-width pattern
+    present in the accepted input. Other unexpected names remain untouched and
+    are rejected by the existing TORAX validation.
+    """
+    for profile_1d in core_profiles_data.profiles_1d:
+        for ion in profile_1d.ion:
+            raw_name = str(ion.name)
+            if len(raw_name) <= 2:
+                continue
+            head = raw_name[:2].strip()
+            tail = raw_name[-2:].strip()
+            if head and head == tail and raw_name[2:-2].isspace():
+                ion.name = head
 
 
 def numerics_overrides(
@@ -540,6 +561,8 @@ class ToraxMuscleRunner:
         core_profiles_data, self.t_cur = ids_data
 
         if port_name == "in_f" and self.settings.use_IDS_plasma_composition:
+            if self.settings.normalize_padded_ion_names:
+                normalize_padded_ion_names(core_profiles_data)
             # Update TORAX config with input plasma composition from received core_profiles IDS.
             plasma_composition = plasma_composition_from_IMAS(
                 core_profiles_data, main_ions_symbols=["H"]
@@ -547,6 +570,10 @@ class ToraxMuscleRunner:
             self.torax_config.update_fields({"plasma_composition": plasma_composition})
 
         core_profiles_conditions = profile_conditions_from_IMAS(core_profiles_data)
+        if port_name == "in_f" and self.settings.initial_psi_mode is not None:
+            core_profiles_conditions["initial_psi_mode"] = (
+                self.settings.initial_psi_mode
+            )
         self.torax_config.update_fields(
             {"profile_conditions": core_profiles_conditions}
         )

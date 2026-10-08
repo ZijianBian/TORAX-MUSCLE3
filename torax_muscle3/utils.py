@@ -1,4 +1,5 @@
 """
+Modified for PDS integration: optional settings and inherited geometry fields.
 Utility functions for muscle3 and torax.
 """
 
@@ -72,7 +73,7 @@ class ExtraVarCollection(BaseModel):
 
 def get_geometry_config_dict(config: torax.ToraxConfig) -> dict:
     # only get overlapping keys from given config and IMASConfig
-    imas_config_keys = IMASConfig.__annotations__
+    imas_config_keys = IMASConfig.model_fields
     # we can pick a random entry since all fields are time_invariant except hires_fac
     # (which we can ignore) and equilibrium_object (which we overwrite)
     if isinstance(config.geometry.geometry_configs, dict):
@@ -129,6 +130,10 @@ class ToraxActorSettings:
     """Send every internal TORAX timeslice instead of just the requested one."""
     use_IDS_plasma_composition: bool = False
     """Take plasma composition from the incoming IDS rather than the config."""
+    normalize_padded_ion_names: bool = False
+    """Normalize legacy fixed-width duplicated IMAS ion names before parsing."""
+    initial_psi_mode: Optional[str] = None
+    """Optional initial psi source passed to TORAX profile conditions."""
     t_initial: Optional[float] = None
     """Override for the config's initial simulation time."""
     t_final: Optional[float] = None
@@ -161,6 +166,10 @@ class ToraxActorSettings:
             use_IDS_plasma_composition=get_setting_optional(
                 instance, "use_IDS_plasma_composition", False
             ),
+            normalize_padded_ion_names=get_setting_optional(
+                instance, "normalize_padded_ion_names", False
+            ),
+            initial_psi_mode=get_setting_optional(instance, "initial_psi_mode", None),
             t_initial=get_setting_optional(instance, "t_initial", None),
             t_final=get_setting_optional(instance, "t_final", None),
             fixed_dt=get_setting_optional(instance, "fixed_dt", None),
